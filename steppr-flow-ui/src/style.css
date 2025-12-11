@@ -1,7 +1,34 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
+/* ============================================================================
+   Theme Configuration (Tailwind v4)
+   ============================================================================ */
+@theme {
+  /* Primary color palette */
+  --color-primary-50: #f0f9ff;
+  --color-primary-100: #e0f2fe;
+  --color-primary-200: #bae6fd;
+  --color-primary-300: #7dd3fc;
+  --color-primary-400: #38bdf8;
+  --color-primary-500: #0ea5e9;
+  --color-primary-600: #0284c7;
+  --color-primary-700: #0369a1;
+  --color-primary-800: #075985;
+  --color-primary-900: #0c4a6e;
+  --color-primary-950: #082f49;
+
+  /* Custom animations */
+  --animate-pulse-slow: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+
+  @keyframes pulse-slow {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+}
+
+/* ============================================================================
+   Base Styles
+   ============================================================================ */
 @layer base {
   :root {
     --color-bg-primary: #ffffff;
@@ -10,6 +37,9 @@
   }
 }
 
+/* ============================================================================
+   Component Styles
+   ============================================================================ */
 @layer components {
   .btn {
     @apply px-4 py-2 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white;
@@ -31,45 +61,47 @@
     @apply bg-emerald-600 hover:bg-emerald-700 text-white focus:ring-emerald-500;
   }
 
-  /* Compact button styles */
-  .btn-sm {
-    @apply px-2.5 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded hover:bg-gray-50 transition-colors;
-  }
-
-  .btn-sm-success {
-    @apply px-2.5 py-1.5 text-xs font-medium text-white bg-emerald-500 rounded hover:bg-emerald-600 transition-colors;
-  }
-
-  .btn-sm-danger {
-    @apply px-2.5 py-1.5 text-xs font-medium text-white bg-red-500 rounded hover:bg-red-600 transition-colors;
-  }
-
   .card {
     @apply bg-white border border-gray-200 rounded-xl shadow-sm;
-  }
-
-  .card-compact {
-    @apply bg-white border border-gray-100 rounded-lg;
   }
 
   .input {
     @apply w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all;
   }
 
-  .input-sm {
-    @apply w-full px-3 py-1.5 text-xs bg-white border border-gray-200 rounded text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500;
-  }
-
   .select {
     @apply w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all cursor-pointer;
   }
 
-  .select-sm {
-    @apply px-2.5 py-1.5 text-xs bg-white border border-gray-200 rounded text-gray-700 focus:outline-none focus:ring-1 focus:ring-primary-500 cursor-pointer;
+  /* Code block styling */
+  .json-viewer {
+    @apply font-mono text-sm bg-slate-50 border border-slate-200 rounded-lg p-4 overflow-auto max-h-96;
+  }
+
+  .json-key {
+    @apply text-purple-700;
+  }
+
+  .json-string {
+    @apply text-emerald-700;
+  }
+
+  .json-number {
+    @apply text-amber-700;
+  }
+
+  .json-boolean {
+    @apply text-sky-700;
+  }
+
+  .json-null {
+    @apply text-gray-400;
   }
 }
 
-/* Custom scrollbar */
+/* ============================================================================
+   Custom Scrollbar
+   ============================================================================ */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -86,39 +118,4 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
-}
-
-/* Animations */
-@keyframes pulse-slow {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-.animate-pulse-slow {
-  animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-/* Code block styling */
-.json-viewer {
-  @apply font-mono text-sm bg-slate-50 border border-slate-200 rounded-lg p-4 overflow-auto max-h-96;
-}
-
-.json-key {
-  @apply text-purple-700;
-}
-
-.json-string {
-  @apply text-emerald-700;
-}
-
-.json-number {
-  @apply text-amber-700;
-}
-
-.json-boolean {
-  @apply text-sky-700;
-}
-
-.json-null {
-  @apply text-gray-400;
 }
