@@ -28,11 +28,11 @@
     "postcss": "^8.4.0",
     "autoprefixer": "^10.4.0",
     "@heroicons/vue": "^2.1.0",
-    "vitest": "^2.1.0",
+    "vitest": "^4.0.15",
     "@vue/test-utils": "^2.4.0",
     "jsdom": "^25.0.0",
-    "@vitest/coverage-v8": "^2.1.0",
-    "cypress": "^13.0.0",
+    "@vitest/coverage-v8": "^4.0.15",
+    "cypress": "^15.7.1",
     "msw": "^2.0.0"
   }
 }
