@@ -1,0 +1,136 @@
+package io.thalyazin.broker.rabbitmq;
+
+import io.thalyazin.core.ThalyazinProperties;
+import io.thalyazin.core.service.WorkflowRegistry;
+import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.core.*;
+import org.springframework.amqp.rabbit.core.RabbitAdmin;
+import org.springframework.beans.factory.SmartInitializingSingleton;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Initializes RabbitMQ queues, exchanges and bindings for workflows.
+ */
+@Slf4j
+public class RabbitMQQueueInitializer implements SmartInitializingSingleton {
+
+    private final WorkflowRegistry workflowRegistry;
+    private final RabbitAdmin rabbitAdmin;
+    private final ThalyazinProperties properties;
+
+    @Getter
+    private final List<String> workflowQueueNames = new ArrayList<>();
+
+    public RabbitMQQueueInitializer(WorkflowRegistry workflowRegistry,
+                                     RabbitAdmin rabbitAdmin,
+                                     ThalyazinProperties properties) {
+        this.workflowRegistry = workflowRegistry;
+        this.rabbitAdmin = rabbitAdmin;
+        this.properties = properties;
+    }
+
+    @Override
+    public void afterSingletonsInstantiated() {
+        initializeQueues();
+    }
+
+    private void initializeQueues() {
+        String exchangeName = properties.getRabbitmq().getExchange();
+        String dlqSuffix = properties.getRabbitmq().getDlqSuffix();
+
+        log.info("Initializing RabbitMQ infrastructure for workflows...");
+
+        // Create the main exchange (topic exchange for flexible routing)
+        TopicExchange exchange = new TopicExchange(exchangeName, true, false);
+        rabbitAdmin.declareExchange(exchange);
+        log.info("Declared exchange: {}", exchangeName);
+
+        // Create DLQ exchange
+        String dlqExchangeName = exchangeName + ".dlq";
+        DirectExchange dlqExchange = new DirectExchange(dlqExchangeName, true, false);
+        rabbitAdmin.declareExchange(dlqExchange);
+        log.info("Declared DLQ exchange: {}", dlqExchangeName);
+
+        // Create queues for each registered workflow
+        List<String> topics = workflowRegistry.getTopics();
+        for (String topic : topics) {
+            createWorkflowQueues(topic, exchange, dlqExchange, exchangeName, dlqSuffix);
+        }
+
+        // Add a default fallback queue if no workflows are registered
+        if (workflowQueueNames.isEmpty()) {
+            workflowQueueNames.add("thalyazin-no-workflows");
+            Queue fallbackQueue = QueueBuilder.durable("thalyazin-no-workflows").build();
+            rabbitAdmin.declareQueue(fallbackQueue);
+        }
+
+        log.info("Initialized {} workflow queue(s)", workflowQueueNames.size());
+    }
+
+    private void createWorkflowQueues(String topic, TopicExchange exchange,
+                                       DirectExchange dlqExchange,
+                                       String exchangeName, String dlqSuffix) {
+        // Main workflow queue
+        String queueName = topic;
+        String dlqQueueName = topic + dlqSuffix;
+        String retryQueueName = topic + ".retry";
+        String completedQueueName = topic + ".completed";
+
+        // Create main queue with DLQ configuration
+        Queue mainQueue = QueueBuilder.durable(queueName)
+                .withArgument("x-dead-letter-exchange", exchangeName + ".dlq")
+                .withArgument("x-dead-letter-routing-key", dlqQueueName)
+                .build();
+        rabbitAdmin.declareQueue(mainQueue);
+        workflowQueueNames.add(queueName);
+        log.debug("Declared queue: {}", queueName);
+
+        // Bind main queue to exchange
+        Binding mainBinding = BindingBuilder.bind(mainQueue)
+                .to(exchange)
+                .with(topic);
+        rabbitAdmin.declareBinding(mainBinding);
+
+        // Create DLQ
+        Queue dlqQueue = QueueBuilder.durable(dlqQueueName).build();
+        rabbitAdmin.declareQueue(dlqQueue);
+        log.debug("Declared DLQ: {}", dlqQueueName);
+
+        // Bind DLQ
+        Binding dlqBinding = BindingBuilder.bind(dlqQueue)
+                .to(dlqExchange)
+                .with(dlqQueueName);
+        rabbitAdmin.declareBinding(dlqBinding);
+
+        // Create retry queue with TTL for delayed reprocessing
+        Queue retryQueue = QueueBuilder.durable(retryQueueName)
+                .withArgument("x-dead-letter-exchange", exchangeName)
+                .withArgument("x-dead-letter-routing-key", topic)
+                .build();
+        rabbitAdmin.declareQueue(retryQueue);
+        workflowQueueNames.add(retryQueueName);
+        log.debug("Declared retry queue: {}", retryQueueName);
+
+        // Bind retry queue
+        Binding retryBinding = BindingBuilder.bind(retryQueue)
+                .to(exchange)
+                .with(topic + ".retry");
+        rabbitAdmin.declareBinding(retryBinding);
+
+        // Create completed queue
+        Queue completedQueue = QueueBuilder.durable(completedQueueName).build();
+        rabbitAdmin.declareQueue(completedQueue);
+        log.debug("Declared completed queue: {}", completedQueueName);
+
+        // Bind completed queue
+        Binding completedBinding = BindingBuilder.bind(completedQueue)
+                .to(exchange)
+                .with(topic + ".completed");
+        rabbitAdmin.declareBinding(completedBinding);
+
+        log.info("Created queue infrastructure for workflow: {}", topic);
+    }
+}

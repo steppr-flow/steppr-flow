@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: thalyazin-rabbitmq-sample
+
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+    virtual-host: /
+
+server:
+  port: 8011
+
+thalyazin:
+  broker: rabbitmq
+  rabbitmq:
+    exchange: thalyazin.workflows
+    prefetch-count: 10
+  agent:
+    server-url: http://localhost:8090
+    auto-register: true
+
+logging:
+  level:
+    io.thalyazin: DEBUG
+    io.thalyazin.sample: DEBUG

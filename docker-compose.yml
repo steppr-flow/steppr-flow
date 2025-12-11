@@ -1,0 +1,150 @@
+services:
+  # Zookeeper (required for Confluent Kafka)
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: thalyazin-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - thalyazin-network
+
+  # Apache Kafka (Confluent Platform)
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: thalyazin-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    depends_on:
+      - zookeeper
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - thalyazin-network
+
+  # MongoDB
+  mongodb:
+    image: mongo:7.0
+    container_name: thalyazin-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: thalyazin
+    volumes:
+      - mongodb-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    networks:
+      - thalyazin-network
+
+  # Mongo Express (MongoDB GUI)
+  mongo-express:
+    image: mongo-express:latest
+    container_name: thalyazin-mongo-express
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_SERVER: mongodb
+      ME_CONFIG_MONGODB_PORT: 27017
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: admin
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - thalyazin-network
+
+  # RabbitMQ
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: thalyazin-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - thalyazin-network
+
+  # Thalyazin Monitoring Server
+  thalyazin-server:
+    build:
+      context: .
+      dockerfile: thalyazin-server/Dockerfile
+    container_name: thalyazin-server
+    ports:
+      - "8090:8090"
+    environment:
+      SERVER_PORT: 8090
+      MONGODB_URI: mongodb://mongodb:27017/thalyazin
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_CONSUMER_GROUP: thalyazin-server
+      KAFKA_CONSUMER_CONCURRENCY: 3
+      LOG_LEVEL: INFO
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8090/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - thalyazin-network
+
+  # Thalyazin UI (Vue.js frontend served by nginx)
+  thalyazin-ui:
+    build:
+      context: ./thalyazin-ui
+      dockerfile: Dockerfile
+    container_name: thalyazin-ui
+    ports:
+      - "3000:80"
+    environment:
+      API_URL: http://thalyazin-server:8090
+    depends_on:
+      thalyazin-server:
+        condition: service_healthy
+    networks:
+      - thalyazin-network
+
+volumes:
+  kafka-data:
+  mongodb-data:
+  rabbitmq-data:
+
+networks:
+  thalyazin-network:
+    driver: bridge

@@ -1,0 +1,3 @@
+io.thalyazin.core.ThalyazinAutoConfiguration
+io.thalyazin.core.tracing.TracingAutoConfiguration
+io.thalyazin.core.metrics.WorkflowMetricsAutoConfiguration

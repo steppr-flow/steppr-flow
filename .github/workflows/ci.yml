@@ -1,0 +1,270 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  JAVA_VERSION: '21'
+  NODE_VERSION: '20'
+
+jobs:
+  # ===========================================
+  # Backend Build & Test
+  # ===========================================
+  build:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build with Maven
+        run: mvn -B compile --file pom.xml
+
+      - name: Run tests
+        run: mvn -B test --file pom.xml
+
+      - name: Generate coverage report
+        run: mvn -B jacoco:report --file pom.xml
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: '**/target/site/jacoco/jacoco.xml'
+          fail_ci_if_error: false
+          verbose: true
+
+      - name: Package
+        run: mvn -B package -DskipTests --file pom.xml
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: |
+            **/target/surefire-reports/*.xml
+            **/target/site/jacoco/
+          retention-days: 7
+
+      - name: Upload JAR artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: jars
+          path: |
+            **/target/*.jar
+            !**/target/*-sources.jar
+          retention-days: 7
+
+  # ===========================================
+  # Frontend Build
+  # ===========================================
+  frontend:
+    name: Frontend Build
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: thalyazin-ui
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: thalyazin-ui/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint --if-present
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload frontend build
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: thalyazin-ui/dist
+          retention-days: 7
+
+  # ===========================================
+  # Code Quality
+  # ===========================================
+  code-quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Check code style (Checkstyle)
+        run: mvn -B checkstyle:check --file pom.xml
+
+      - name: Static analysis (SpotBugs)
+        run: mvn -B spotbugs:check --file pom.xml
+
+  # ===========================================
+  # Integration Tests - Kafka
+  # ===========================================
+  integration-tests-kafka:
+    name: Integration Tests (Kafka)
+    runs-on: ubuntu-latest
+    needs: build
+
+    services:
+      mongodb:
+        image: mongo:7.0
+        ports:
+          - 27017:27017
+
+      kafka:
+        image: confluentinc/cp-kafka:7.5.0
+        ports:
+          - 9092:9092
+        env:
+          KAFKA_NODE_ID: 1
+          KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+          KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+          KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+          KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+          KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+          KAFKA_PROCESS_ROLES: broker,controller
+          KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+          CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Wait for services
+        run: |
+          echo "Waiting for MongoDB..."
+          timeout 30 bash -c 'until nc -z localhost 27017; do sleep 1; done'
+          echo "Waiting for Kafka..."
+          timeout 60 bash -c 'until nc -z localhost 9092; do sleep 1; done'
+          echo "Services ready!"
+
+      - name: Run Kafka integration tests
+        run: mvn -B verify -DskipUnitTests -pl thalyazin-broker-kafka --file pom.xml
+        env:
+          SPRING_DATA_MONGODB_URI: mongodb://localhost:27017/thalyazin-test
+          SPRING_KAFKA_BOOTSTRAP_SERVERS: localhost:9092
+
+  # ===========================================
+  # Integration Tests - RabbitMQ
+  # ===========================================
+  integration-tests-rabbitmq:
+    name: Integration Tests (RabbitMQ)
+    runs-on: ubuntu-latest
+    needs: build
+
+    services:
+      mongodb:
+        image: mongo:7.0
+        ports:
+          - 27017:27017
+
+      rabbitmq:
+        image: rabbitmq:3.13-management-alpine
+        ports:
+          - 5672:5672
+          - 15672:15672
+        env:
+          RABBITMQ_DEFAULT_USER: guest
+          RABBITMQ_DEFAULT_PASS: guest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Wait for services
+        run: |
+          echo "Waiting for MongoDB..."
+          timeout 30 bash -c 'until nc -z localhost 27017; do sleep 1; done'
+          echo "Waiting for RabbitMQ..."
+          timeout 60 bash -c 'until nc -z localhost 5672; do sleep 1; done'
+          echo "Services ready!"
+
+      - name: Run RabbitMQ integration tests
+        run: mvn -B verify -DskipUnitTests -pl thalyazin-broker-rabbitmq --file pom.xml
+        env:
+          SPRING_DATA_MONGODB_URI: mongodb://localhost:27017/thalyazin-test
+          SPRING_RABBITMQ_HOST: localhost
+          SPRING_RABBITMQ_PORT: 5672
+          SPRING_RABBITMQ_USERNAME: guest
+          SPRING_RABBITMQ_PASSWORD: guest
+
+  # ===========================================
+  # Security Scan
+  # ===========================================
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: build
+
+    permissions:
+      security-events: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: maven
+
+      - name: OWASP Dependency Check
+        run: mvn -B org.owasp:dependency-check-maven:check --file pom.xml
+        continue-on-error: true
+
+      - name: Upload OWASP report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: owasp-report
+          path: '**/target/dependency-check-report.html'
+          retention-days: 7
