@@ -1,0 +1,3 @@
+io.stepprflow.core.StepprFlowAutoConfiguration
+io.stepprflow.core.tracing.TracingAutoConfiguration
+io.stepprflow.core.metrics.WorkflowMetricsAutoConfiguration

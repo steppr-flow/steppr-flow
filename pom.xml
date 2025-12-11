@@ -6,23 +6,63 @@
 
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>io.thalyazin</groupId>
-    <artifactId>thalyazin-parent</artifactId>
+    <groupId>io.stepprflow</groupId>
+    <artifactId>steppr-flow-parent</artifactId>
     <version>1.0.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
-    <name>Thalyazin</name>
+    <name>Steppr Flow</name>
     <description>Multi-broker workflow orchestration framework for Spring Boot</description>
-    <url>https://github.com/thalyazin/thalyazin</url>
+    <url>https://github.com/steppr-flow/steppr-flow</url>
+
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <id>stepprflow</id>
+            <name>Steppr Flow Team</name>
+            <email>contact@stepprflow.io</email>
+            <organization>Steppr Flow</organization>
+            <organizationUrl>https://github.com/steppr-flow</organizationUrl>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:git://github.com/steppr-flow/steppr-flow.git</connection>
+        <developerConnection>scm:git:ssh://github.com:steppr-flow/steppr-flow.git</developerConnection>
+        <url>https://github.com/steppr-flow/steppr-flow</url>
+        <tag>HEAD</tag>
+    </scm>
+
+    <distributionManagement>
+        <!-- GitHub Packages -->
+        <repository>
+            <id>github</id>
+            <name>GitHub Packages</name>
+            <url>https://maven.pkg.github.com/steppr-flow/steppr-flow</url>
+        </repository>
+        <!-- Maven Central (Sonatype OSSRH) -->
+        <snapshotRepository>
+            <id>ossrh</id>
+            <name>Sonatype Snapshots</name>
+            <url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
+        </snapshotRepository>
+    </distributionManagement>
 
     <modules>
-        <module>thalyazin-core</module>
-        <module>thalyazin-broker-kafka</module>
-        <module>thalyazin-broker-rabbitmq</module>
-        <module>thalyazin-monitor</module>
-        <module>thalyazin-ui</module>
-        <module>thalyazin-agent</module>
-        <module>thalyazin-server</module>
+        <module>steppr-flow-core</module>
+        <module>steppr-flow-spring-kafka</module>
+        <module>steppr-flow-spring-rabbitmq</module>
+        <module>steppr-flow-spring-monitor</module>
+        <module>steppr-flow-ui</module>
+        <module>steppr-flow-spring-boot-starter</module>
+        <module>steppr-flow-dashboard</module>
     </modules>
 
     <profiles>
@@ -30,10 +70,58 @@
         <profile>
             <id>full</id>
             <modules>
-                <module>thalyazin-kafka-sample</module>
-                <module>thalyazin-rabbitmq-sample</module>
-                <module>thalyazin-load-tests</module>
+                <module>steppr-flow-kafka-sample</module>
+                <module>steppr-flow-rabbitmq-sample</module>
+                <module>steppr-flow-load-tests</module>
             </modules>
+        </profile>
+
+        <!-- Profile for Maven Central release -->
+        <profile>
+            <id>release</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>3.2.7</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                                <configuration>
+                                    <gpgArguments>
+                                        <arg>--pinentry-mode</arg>
+                                        <arg>loopback</arg>
+                                    </gpgArguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>0.6.0</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <publishingServerId>central</publishingServerId>
+                            <autoPublish>true</autoPublish>
+                            <waitUntil>published</waitUntil>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
         </profile>
     </profiles>
 
@@ -56,14 +144,21 @@
         <!-- Micrometer Tracing -->
         <micrometer-tracing.version>1.4.2</micrometer-tracing.version>
 
-        <!-- Thalyazin version -->
-        <thalyazin.version>${project.version}</thalyazin.version>
+        <!-- Steppr Flow version -->
+        <steppr-flow.version>${project.version}</steppr-flow.version>
 
         <!-- JaCoCo -->
         <jacoco.version>0.8.12</jacoco.version>
 
         <!-- Lombok - aligned with Spring Boot managed version -->
         <lombok.version>1.18.42</lombok.version>
+
+        <!-- Checkstyle -->
+        <checkstyle.version>10.21.4</checkstyle.version>
+        <maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
+
+        <!-- Root directory for multi-module project -->
+        <main.basedir>${project.basedir}</main.basedir>
     </properties>
 
     <dependencyManagement>
@@ -86,36 +181,36 @@
                 <scope>import</scope>
             </dependency>
 
-            <!-- Thalyazin modules -->
+            <!-- Steppr Flow modules -->
             <dependency>
-                <groupId>io.thalyazin</groupId>
-                <artifactId>thalyazin-core</artifactId>
-                <version>${thalyazin.version}</version>
+                <groupId>io.stepprflow</groupId>
+                <artifactId>steppr-flow-core</artifactId>
+                <version>${steppr-flow.version}</version>
             </dependency>
             <dependency>
-                <groupId>io.thalyazin</groupId>
-                <artifactId>thalyazin-broker-kafka</artifactId>
-                <version>${thalyazin.version}</version>
+                <groupId>io.stepprflow</groupId>
+                <artifactId>steppr-flow-spring-kafka</artifactId>
+                <version>${steppr-flow.version}</version>
             </dependency>
             <dependency>
-                <groupId>io.thalyazin</groupId>
-                <artifactId>thalyazin-broker-rabbitmq</artifactId>
-                <version>${thalyazin.version}</version>
+                <groupId>io.stepprflow</groupId>
+                <artifactId>steppr-flow-spring-rabbitmq</artifactId>
+                <version>${steppr-flow.version}</version>
             </dependency>
             <dependency>
-                <groupId>io.thalyazin</groupId>
-                <artifactId>thalyazin-monitor</artifactId>
-                <version>${thalyazin.version}</version>
+                <groupId>io.stepprflow</groupId>
+                <artifactId>steppr-flow-spring-monitor</artifactId>
+                <version>${steppr-flow.version}</version>
             </dependency>
             <dependency>
-                <groupId>io.thalyazin</groupId>
-                <artifactId>thalyazin-ui</artifactId>
-                <version>${thalyazin.version}</version>
+                <groupId>io.stepprflow</groupId>
+                <artifactId>steppr-flow-ui</artifactId>
+                <version>${steppr-flow.version}</version>
             </dependency>
             <dependency>
-                <groupId>io.thalyazin</groupId>
-                <artifactId>thalyazin-agent</artifactId>
-                <version>${thalyazin.version}</version>
+                <groupId>io.stepprflow</groupId>
+                <artifactId>steppr-flow-spring-boot-starter</artifactId>
+                <version>${steppr-flow.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -179,6 +274,96 @@
                         </execution>
                     </executions>
                 </plugin>
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>versions-maven-plugin</artifactId>
+                    <version>2.18.0</version>
+                    <configuration>
+                        <generateBackupPoms>false</generateBackupPoms>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>flatten-maven-plugin</artifactId>
+                    <version>1.6.0</version>
+                    <configuration>
+                        <updatePomFile>true</updatePomFile>
+                        <flattenMode>resolveCiFriendliesOnly</flattenMode>
+                    </configuration>
+                    <executions>
+                        <execution>
+                            <id>flatten</id>
+                            <phase>process-resources</phase>
+                            <goals>
+                                <goal>flatten</goal>
+                            </goals>
+                        </execution>
+                        <execution>
+                            <id>flatten.clean</id>
+                            <phase>clean</phase>
+                            <goals>
+                                <goal>clean</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-source-plugin</artifactId>
+                    <version>3.3.1</version>
+                    <executions>
+                        <execution>
+                            <id>attach-sources</id>
+                            <goals>
+                                <goal>jar-no-fork</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-javadoc-plugin</artifactId>
+                    <version>3.10.1</version>
+                    <configuration>
+                        <doclint>none</doclint>
+                        <quiet>true</quiet>
+                    </configuration>
+                    <executions>
+                        <execution>
+                            <id>attach-javadocs</id>
+                            <goals>
+                                <goal>jar</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-checkstyle-plugin</artifactId>
+                    <version>${maven-checkstyle-plugin.version}</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.puppycrawl.tools</groupId>
+                            <artifactId>checkstyle</artifactId>
+                            <version>${checkstyle.version}</version>
+                        </dependency>
+                    </dependencies>
+                    <configuration>
+                        <configLocation>${main.basedir}/config/checkstyle/checkstyle.xml</configLocation>
+                        <consoleOutput>true</consoleOutput>
+                        <failsOnError>true</failsOnError>
+                        <includeTestSourceDirectory>false</includeTestSourceDirectory>
+                    </configuration>
+                    <executions>
+                        <execution>
+                            <id>validate</id>
+                            <phase>validate</phase>
+                            <goals>
+                                <goal>check</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
             </plugins>
         </pluginManagement>
 
@@ -190,6 +375,10 @@
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
             </plugin>
         </plugins>
     </build>

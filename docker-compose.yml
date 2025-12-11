@@ -2,17 +2,17 @@ services:
   # Zookeeper (required for Confluent Kafka)
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
-    container_name: thalyazin-zookeeper
+    container_name: steppr-flow-zookeeper
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
     networks:
-      - thalyazin-network
+      - steppr-flow-network
 
   # Apache Kafka (Confluent Platform)
   kafka:
     image: confluentinc/cp-kafka:7.5.0
-    container_name: thalyazin-kafka
+    container_name: steppr-flow-kafka
     ports:
       - "9092:9092"
     environment:
@@ -29,22 +29,22 @@ services:
     depends_on:
       - zookeeper
     healthcheck:
-      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1"]
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-dashboard localhost:9092 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 60s
     networks:
-      - thalyazin-network
+      - steppr-flow-network
 
   # MongoDB
   mongodb:
     image: mongo:7.0
-    container_name: thalyazin-mongodb
+    container_name: steppr-flow-mongodb
     ports:
       - "27017:27017"
     environment:
-      MONGO_INITDB_DATABASE: thalyazin
+      MONGO_INITDB_DATABASE: stepprflow
     volumes:
       - mongodb-data:/data/db
     healthcheck:
@@ -54,12 +54,12 @@ services:
       retries: 5
       start_period: 20s
     networks:
-      - thalyazin-network
+      - steppr-flow-network
 
   # Mongo Express (MongoDB GUI)
   mongo-express:
     image: mongo-express:latest
-    container_name: thalyazin-mongo-express
+    container_name: steppr-flow-mongo-express
     ports:
       - "8081:8081"
     environment:
@@ -71,12 +71,12 @@ services:
       mongodb:
         condition: service_healthy
     networks:
-      - thalyazin-network
+      - steppr-flow-network
 
   # RabbitMQ
   rabbitmq:
     image: rabbitmq:3.13-management-alpine
-    container_name: thalyazin-rabbitmq
+    container_name: steppr-flow-rabbitmq
     ports:
       - "5672:5672"
       - "15672:15672"
@@ -92,27 +92,25 @@ services:
       retries: 5
       start_period: 30s
     networks:
-      - thalyazin-network
+      - steppr-flow-network
 
-  # Thalyazin Monitoring Server
-  thalyazin-server:
+  # Steppr Flow Dashboard (Monitoring Server)
+  steppr-flow-dashboard:
     build:
       context: .
-      dockerfile: thalyazin-server/Dockerfile
-    container_name: thalyazin-server
+      dockerfile: steppr-flow-dashboard/Dockerfile
+    container_name: steppr-flow-dashboard
     ports:
       - "8090:8090"
     environment:
       SERVER_PORT: 8090
-      MONGODB_URI: mongodb://mongodb:27017/thalyazin
+      MONGODB_URI: mongodb://mongodb:27017/stepprflow
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      KAFKA_CONSUMER_GROUP: thalyazin-server
+      KAFKA_CONSUMER_GROUP: steppr-flow-dashboard
       KAFKA_CONSUMER_CONCURRENCY: 3
       LOG_LEVEL: INFO
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC"
     depends_on:
-      kafka:
-        condition: service_healthy
       mongodb:
         condition: service_healthy
     healthcheck:
@@ -122,23 +120,23 @@ services:
       retries: 5
       start_period: 60s
     networks:
-      - thalyazin-network
+      - steppr-flow-network
 
-  # Thalyazin UI (Vue.js frontend served by nginx)
-  thalyazin-ui:
+  # Steppr Flow UI (Vue.js frontend served by nginx)
+  steppr-flow-ui:
     build:
-      context: ./thalyazin-ui
+      context: ./steppr-flow-ui
       dockerfile: Dockerfile
-    container_name: thalyazin-ui
+    container_name: steppr-flow-ui
     ports:
       - "3000:80"
     environment:
-      API_URL: http://thalyazin-server:8090
+      API_URL: http://steppr-flow-dashboard:8090
     depends_on:
-      thalyazin-server:
+      steppr-flow-dashboard:
         condition: service_healthy
     networks:
-      - thalyazin-network
+      - steppr-flow-network
 
 volumes:
   kafka-data:
@@ -146,5 +144,5 @@ volumes:
   rabbitmq-data:
 
 networks:
-  thalyazin-network:
+  steppr-flow-network:
     driver: bridge

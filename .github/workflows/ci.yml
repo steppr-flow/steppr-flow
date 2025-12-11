@@ -12,11 +12,80 @@ env:
 
 jobs:
   # ===========================================
+  # Detect Changed Modules (for incremental builds)
+  # ===========================================
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      core: ${{ steps.changes.outputs.core }}
+      kafka: ${{ steps.changes.outputs.kafka }}
+      rabbitmq: ${{ steps.changes.outputs.rabbitmq }}
+      monitor: ${{ steps.changes.outputs.monitor }}
+      starter: ${{ steps.changes.outputs.starter }}
+      dashboard: ${{ steps.changes.outputs.dashboard }}
+      ui: ${{ steps.changes.outputs.ui }}
+      samples: ${{ steps.changes.outputs.samples }}
+      backend-any: ${{ steps.changes.outputs.backend-any }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changes
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            core:
+              - 'steppr-flow-core/**'
+              - 'pom.xml'
+            kafka:
+              - 'steppr-flow-spring-kafka/**'
+              - 'steppr-flow-core/**'
+              - 'pom.xml'
+            rabbitmq:
+              - 'steppr-flow-spring-rabbitmq/**'
+              - 'steppr-flow-core/**'
+              - 'pom.xml'
+            monitor:
+              - 'steppr-flow-spring-monitor/**'
+              - 'steppr-flow-core/**'
+              - 'pom.xml'
+            starter:
+              - 'steppr-flow-spring-boot-starter/**'
+              - 'steppr-flow-core/**'
+              - 'pom.xml'
+            dashboard:
+              - 'steppr-flow-dashboard/**'
+              - 'steppr-flow-spring-monitor/**'
+              - 'steppr-flow-spring-kafka/**'
+              - 'steppr-flow-core/**'
+              - 'pom.xml'
+            ui:
+              - 'steppr-flow-ui/**'
+            samples:
+              - 'steppr-flow-kafka-sample/**'
+              - 'steppr-flow-rabbitmq-sample/**'
+            backend-any:
+              - 'steppr-flow-core/**'
+              - 'steppr-flow-spring-kafka/**'
+              - 'steppr-flow-spring-rabbitmq/**'
+              - 'steppr-flow-spring-monitor/**'
+              - 'steppr-flow-spring-boot-starter/**'
+              - 'steppr-flow-dashboard/**'
+              - 'pom.xml'
+
+  # ===========================================
   # Backend Build & Test
   # ===========================================
   build:
     name: Build & Test
     runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend-any == 'true' || github.ref == 'refs/heads/main'
 
     steps:
       - name: Checkout code
@@ -73,10 +142,12 @@ jobs:
   frontend:
     name: Frontend Build
     runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.ui == 'true' || github.ref == 'refs/heads/main'
 
     defaults:
       run:
-        working-directory: thalyazin-ui
+        working-directory: steppr-flow-ui
 
     steps:
       - name: Checkout code
@@ -87,13 +158,16 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: thalyazin-ui/package-lock.json
+          cache-dependency-path: steppr-flow-ui/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
       - name: Lint
         run: npm run lint --if-present
+
+      - name: Run tests
+        run: npm run test --if-present
 
       - name: Build
         run: npm run build
@@ -102,7 +176,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: frontend-dist
-          path: thalyazin-ui/dist
+          path: steppr-flow-ui/dist
           retention-days: 7
 
   # ===========================================
@@ -111,7 +185,8 @@ jobs:
   code-quality:
     name: Code Quality
     runs-on: ubuntu-latest
-    needs: build
+    needs: [detect-changes, build]
+    if: needs.detect-changes.outputs.backend-any == 'true' || github.ref == 'refs/heads/main'
 
     steps:
       - name: Checkout code
@@ -136,7 +211,8 @@ jobs:
   integration-tests-kafka:
     name: Integration Tests (Kafka)
     runs-on: ubuntu-latest
-    needs: build
+    needs: [detect-changes, build]
+    if: needs.detect-changes.outputs.kafka == 'true' || github.ref == 'refs/heads/main'
 
     services:
       mongodb:
@@ -179,9 +255,9 @@ jobs:
           echo "Services ready!"
 
       - name: Run Kafka integration tests
-        run: mvn -B verify -DskipUnitTests -pl thalyazin-broker-kafka --file pom.xml
+        run: mvn -B verify -DskipUnitTests -pl steppr-flow-spring-kafka --file pom.xml
         env:
-          SPRING_DATA_MONGODB_URI: mongodb://localhost:27017/thalyazin-test
+          SPRING_DATA_MONGODB_URI: mongodb://localhost:27017/stepprflow-test
           SPRING_KAFKA_BOOTSTRAP_SERVERS: localhost:9092
 
   # ===========================================
@@ -190,7 +266,8 @@ jobs:
   integration-tests-rabbitmq:
     name: Integration Tests (RabbitMQ)
     runs-on: ubuntu-latest
-    needs: build
+    needs: [detect-changes, build]
+    if: needs.detect-changes.outputs.rabbitmq == 'true' || github.ref == 'refs/heads/main'
 
     services:
       mongodb:
@@ -227,9 +304,9 @@ jobs:
           echo "Services ready!"
 
       - name: Run RabbitMQ integration tests
-        run: mvn -B verify -DskipUnitTests -pl thalyazin-broker-rabbitmq --file pom.xml
+        run: mvn -B verify -DskipUnitTests -pl steppr-flow-spring-rabbitmq --file pom.xml
         env:
-          SPRING_DATA_MONGODB_URI: mongodb://localhost:27017/thalyazin-test
+          SPRING_DATA_MONGODB_URI: mongodb://localhost:27017/stepprflow-test
           SPRING_RABBITMQ_HOST: localhost
           SPRING_RABBITMQ_PORT: 5672
           SPRING_RABBITMQ_USERNAME: guest
@@ -241,7 +318,8 @@ jobs:
   security:
     name: Security Scan
     runs-on: ubuntu-latest
-    needs: build
+    needs: [detect-changes, build]
+    if: needs.detect-changes.outputs.backend-any == 'true' || github.ref == 'refs/heads/main'
 
     permissions:
       security-events: write
@@ -268,3 +346,30 @@ jobs:
           name: owasp-report
           path: '**/target/dependency-check-report.html'
           retention-days: 7
+
+  # ===========================================
+  # CI Status (required for branch protection)
+  # ===========================================
+  ci-status:
+    name: CI Status
+    runs-on: ubuntu-latest
+    needs: [detect-changes, build, frontend, code-quality, integration-tests-kafka, integration-tests-rabbitmq, security]
+    if: always()
+
+    steps:
+      - name: Check CI status
+        run: |
+          echo "Backend changes: ${{ needs.detect-changes.outputs.backend-any }}"
+          echo "UI changes: ${{ needs.detect-changes.outputs.ui }}"
+
+          # Check if any required job failed
+          if [[ "${{ needs.build.result }}" == "failure" ]] || \
+             [[ "${{ needs.frontend.result }}" == "failure" ]] || \
+             [[ "${{ needs.code-quality.result }}" == "failure" ]] || \
+             [[ "${{ needs.integration-tests-kafka.result }}" == "failure" ]] || \
+             [[ "${{ needs.integration-tests-rabbitmq.result }}" == "failure" ]]; then
+            echo "One or more required jobs failed"
+            exit 1
+          fi
+
+          echo "All required checks passed!"

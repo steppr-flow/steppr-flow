@@ -1,8 +1,8 @@
-# Thalyazin
+# Steppr Flow
 
 A multi-broker workflow orchestration framework for Spring Boot applications.
 
-Thalyazin enables you to build resilient, async multi-step workflows with support for multiple message brokers (Kafka, RabbitMQ).
+Steppr Flow enables you to build resilient, async multi-step workflows with support for multiple message brokers (Kafka, RabbitMQ).
 
 ## Features
 
@@ -16,11 +16,13 @@ Thalyazin enables you to build resilient, async multi-step workflows with suppor
 
 | Module | Description |
 |--------|-------------|
-| `thalyazin-core` | Core framework, annotations, and abstractions |
-| `thalyazin-broker-kafka` | Apache Kafka message broker implementation |
-| `thalyazin-broker-rabbitmq` | RabbitMQ message broker implementation |
-| `thalyazin-monitor` | Monitoring, persistence, and REST API |
-| `thalyazin-ui` | Dashboard UI for workflow monitoring |
+| `steppr-flow-core` | Core framework, annotations, and abstractions |
+| `steppr-flow-spring-kafka` | Apache Kafka message broker implementation |
+| `steppr-flow-spring-rabbitmq` | RabbitMQ message broker implementation |
+| `steppr-flow-spring-monitor` | Monitoring, persistence, and REST API |
+| `steppr-flow-spring-boot-starter` | Spring Boot auto-configuration |
+| `steppr-flow-dashboard` | Standalone monitoring server |
+| `steppr-flow-ui` | Vue.js dashboard UI for workflow monitoring |
 
 ## Quick Start
 
@@ -29,8 +31,13 @@ Thalyazin enables you to build resilient, async multi-step workflows with suppor
 **Maven (with Kafka):**
 ```xml
 <dependency>
-    <groupId>io.thalyazin</groupId>
-    <artifactId>thalyazin-broker-kafka</artifactId>
+    <groupId>io.stepprflow</groupId>
+    <artifactId>steppr-flow-spring-boot-starter</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+</dependency>
+<dependency>
+    <groupId>io.stepprflow</groupId>
+    <artifactId>steppr-flow-spring-kafka</artifactId>
     <version>1.0.0-SNAPSHOT</version>
 </dependency>
 ```
@@ -38,8 +45,13 @@ Thalyazin enables you to build resilient, async multi-step workflows with suppor
 **Maven (with RabbitMQ):**
 ```xml
 <dependency>
-    <groupId>io.thalyazin</groupId>
-    <artifactId>thalyazin-broker-rabbitmq</artifactId>
+    <groupId>io.stepprflow</groupId>
+    <artifactId>steppr-flow-spring-boot-starter</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+</dependency>
+<dependency>
+    <groupId>io.stepprflow</groupId>
+    <artifactId>steppr-flow-spring-rabbitmq</artifactId>
     <version>1.0.0-SNAPSHOT</version>
 </dependency>
 ```
@@ -47,35 +59,39 @@ Thalyazin enables you to build resilient, async multi-step workflows with suppor
 ### 2. Define a Workflow
 
 ```java
-@Service
+@Component
 @Topic("order-processing")
-public class OrderWorkflow implements Thalyazin {
+public class OrderWorkflow {
 
     @Step(id = 1, label = "Validate order")
-    public void validateOrder(OrderPayload payload) {
+    public OrderPayload validateOrder(OrderPayload payload) {
         // Validation logic
         if (payload.getItems().isEmpty()) {
             throw new IllegalArgumentException("Order must have items");
         }
+        return payload;
     }
 
     @Step(id = 2, label = "Reserve inventory")
-    public void reserveInventory(OrderPayload payload) {
+    public OrderPayload reserveInventory(OrderPayload payload) {
         // Reserve items in inventory
         inventoryService.reserve(payload.getItems());
+        return payload;
     }
 
     @Step(id = 3, label = "Process payment")
     @Timeout(value = 30, unit = TimeUnit.SECONDS)
-    public void processPayment(OrderPayload payload) {
+    public OrderPayload processPayment(OrderPayload payload) {
         // Payment processing
         paymentService.charge(payload.getPaymentInfo());
+        return payload;
     }
 
     @Step(id = 4, label = "Send confirmation")
-    public void sendConfirmation(OrderPayload payload) {
+    public OrderPayload sendConfirmation(OrderPayload payload) {
         // Send confirmation email
         notificationService.sendOrderConfirmation(payload);
+        return payload;
     }
 }
 ```
@@ -108,25 +124,18 @@ public class OrderController {
 
 **application.yml (Kafka):**
 ```yaml
-thalyazin:
-  broker:
-    type: kafka
+steppr-flow:
+  enabled: true
 
 spring:
   kafka:
     bootstrap-servers: localhost:9092
-    consumer:
-      group-id: thalyazin-workers
-      auto-offset-reset: earliest
 ```
 
 **application.yml (RabbitMQ):**
 ```yaml
-thalyazin:
-  broker:
-    type: rabbitmq
-  rabbitmq:
-    exchange: thalyazin-exchange
+steppr-flow:
+  enabled: true
 
 spring:
   rabbitmq:
@@ -143,8 +152,9 @@ spring:
 Marks a class as a workflow handler.
 
 ```java
+@Component
 @Topic(value = "order-processing", description = "Handles order lifecycle")
-public class OrderWorkflow implements Thalyazin { }
+public class OrderWorkflow { }
 ```
 
 | Attribute | Description | Default |
@@ -160,7 +170,9 @@ Marks a method as a workflow step.
 
 ```java
 @Step(id = 1, label = "Validate", description = "Validates input data")
-public void validate(Payload payload) { }
+public Payload validate(Payload payload) {
+    return payload;
+}
 ```
 
 | Attribute | Description | Default |
@@ -178,7 +190,9 @@ Sets execution timeout for a step.
 ```java
 @Step(id = 1, label = "External API call")
 @Timeout(value = 30, unit = TimeUnit.SECONDS)
-public void callExternalApi(Payload payload) { }
+public Payload callExternalApi(Payload payload) {
+    return payload;
+}
 ```
 
 ### @OnSuccess / @OnFailure
@@ -203,16 +217,16 @@ public void onFailed(WorkflowMessage message) {
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      Application                             │
+│                      Application                            │
 ├─────────────────────────────────────────────────────────────┤
 │  WorkflowStarter  │  @Topic Workflows  │  Step Handlers     │
 ├─────────────────────────────────────────────────────────────┤
-│                    thalyazin-core                           │
+│                    steppr-flow-core                         │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
 │  │ StepExecutor │  │WorkflowRegistry│ │MessageBroker │      │
 │  └──────────────┘  └──────────────┘  └──────────────┘       │
 ├─────────────────────────────────────────────────────────────┤
-│  thalyazin-broker-kafka  │  thalyazin-broker-rabbitmq      │
+│  steppr-flow-spring-kafka  │  steppr-flow-spring-rabbitmq   │
 ├─────────────────────────────────────────────────────────────┤
 │          Apache Kafka       │        RabbitMQ               │
 └─────────────────────────────────────────────────────────────┘

@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: stepprflow-rabbitmq-sample
+
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+    virtual-host: /
+
+server:
+  port: 8011
+
+stepprflow:
+  broker: rabbitmq
+  rabbitmq:
+    exchange: stepprflow.workflows
+    prefetch-count: 10
+  agent:
+    server-url: http://localhost:8090
+    auto-register: true
+
+logging:
+  level:
+    io.stepprflow: DEBUG
+    io.stepprflow.sample: DEBUG

@@ -1,0 +1,104 @@
+# Dependabot configuration for automated dependency updates
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates
+
+version: 2
+updates:
+  # Maven dependencies
+  - package-ecosystem: "maven"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Paris"
+    open-pull-requests-limit: 10
+    groups:
+      spring-boot:
+        patterns:
+          - "org.springframework.boot:*"
+          - "org.springframework:*"
+          - "org.springframework.kafka:*"
+          - "org.springframework.amqp:*"
+        update-types:
+          - "minor"
+          - "patch"
+      testing:
+        patterns:
+          - "org.junit.jupiter:*"
+          - "org.mockito:*"
+          - "org.testcontainers:*"
+          - "org.awaitility:*"
+        update-types:
+          - "minor"
+          - "patch"
+      mongodb:
+        patterns:
+          - "org.mongodb:*"
+          - "de.flapdoodle.embed:*"
+      kafka:
+        patterns:
+          - "org.apache.kafka:*"
+          - "io.confluent:*"
+      observability:
+        patterns:
+          - "io.micrometer:*"
+          - "io.opentelemetry:*"
+    labels:
+      - "dependencies"
+      - "maven"
+    commit-message:
+      prefix: "build(deps)"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Paris"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "ci(deps)"
+
+  # npm dependencies for UI module
+  - package-ecosystem: "npm"
+    directory: "/steppr-flow-ui"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Paris"
+    open-pull-requests-limit: 10
+    groups:
+      vue-ecosystem:
+        patterns:
+          - "vue*"
+          - "@vue/*"
+          - "vite*"
+          - "@vitejs/*"
+          - "pinia*"
+          - "vue-router*"
+        update-types:
+          - "minor"
+          - "patch"
+      tailwind:
+        patterns:
+          - "tailwindcss*"
+          - "@tailwindcss/*"
+          - "postcss*"
+          - "autoprefixer*"
+      testing:
+        patterns:
+          - "vitest*"
+          - "@vitest/*"
+          - "cypress*"
+          - "@testing-library/*"
+    labels:
+      - "dependencies"
+      - "npm"
+    commit-message:
+      prefix: "build(deps)"

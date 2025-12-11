@@ -1,6 +1,6 @@
 # Message Broker Configuration
 
-Thalyazin supports multiple message brokers. This guide covers configuration for each supported broker.
+Steppr Flow supports multiple message brokers. This guide covers configuration for each supported broker.
 
 ## Kafka
 
@@ -10,16 +10,16 @@ Apache Kafka is the default broker for high-throughput, distributed workflows.
 
 ```xml
 <dependency>
-    <groupId>io.thalyazin</groupId>
-    <artifactId>thalyazin-broker-kafka</artifactId>
-    <version>${thalyazin.version}</version>
+    <groupId>io.stepprflow</groupId>
+    <artifactId>steppr-flow-spring-kafka</artifactId>
+    <version>${steppr-flow.version}</version>
 </dependency>
 ```
 
 ### Configuration
 
 ```yaml
-thalyazin:
+stepprflow:
   broker:
     type: kafka
 
@@ -34,7 +34,7 @@ spring:
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring.json.trusted.packages: "*"
-        spring.json.value.default.type: io.thalyazin.core.model.WorkflowMessage
+        spring.json.value.default.type: io.stepprflow.core.model.WorkflowMessage
 
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
@@ -76,10 +76,10 @@ Each workflow creates its own topic. Topics are auto-created based on `@Topic` a
 
 ```java
 @Topic(value = "orders", partitions = 6, replication = 3)
-public class OrderWorkflow implements Thalyazin { }
+public class OrderWorkflow implements StepprFlow { }
 
 @Topic(value = "payments", partitions = 3, replication = 3)
-public class PaymentWorkflow implements Thalyazin { }
+public class PaymentWorkflow implements StepprFlow { }
 ```
 
 ---
@@ -92,20 +92,20 @@ RabbitMQ is ideal for simpler deployments and when you need flexible routing.
 
 ```xml
 <dependency>
-    <groupId>io.thalyazin</groupId>
-    <artifactId>thalyazin-broker-rabbitmq</artifactId>
-    <version>${thalyazin.version}</version>
+    <groupId>io.stepprflow</groupId>
+    <artifactId>steppr-flow-spring-rabbitmq</artifactId>
+    <version>${steppr-flow.version}</version>
 </dependency>
 ```
 
 ### Configuration
 
 ```yaml
-thalyazin:
+stepprflow:
   broker:
     type: rabbitmq
   rabbitmq:
-    exchange: thalyazin-exchange
+    exchange: stepprflow-exchange
     exchange-type: direct
 
 spring:
@@ -146,9 +146,9 @@ spring:
         prefetch: 1
         acknowledge-mode: manual
 
-thalyazin:
+stepprflow:
   rabbitmq:
-    exchange: thalyazin-exchange
+    exchange: stepprflow-exchange
     exchange-type: topic  # direct, topic, fanout, headers
     durable: true
     auto-delete: false
@@ -168,11 +168,11 @@ Queues are automatically created based on workflow topics:
 Configure DLQ for failed messages:
 
 ```yaml
-thalyazin:
+stepprflow:
   rabbitmq:
     dead-letter:
       enabled: true
-      exchange: thalyazin-dlx
+      exchange: stepprflow-dlx
       routing-key-suffix: .dlq
 ```
 
@@ -188,20 +188,20 @@ To switch brokers, change the dependency and configuration:
 ```xml
 <!-- Remove -->
 <dependency>
-    <groupId>io.thalyazin</groupId>
-    <artifactId>thalyazin-broker-kafka</artifactId>
+    <groupId>io.stepprflow</groupId>
+    <artifactId>steppr-flow-spring-kafka</artifactId>
 </dependency>
 
 <!-- Add -->
 <dependency>
-    <groupId>io.thalyazin</groupId>
-    <artifactId>thalyazin-broker-rabbitmq</artifactId>
+    <groupId>io.stepprflow</groupId>
+    <artifactId>steppr-flow-spring-rabbitmq</artifactId>
 </dependency>
 ```
 
 2. Update configuration:
 ```yaml
-thalyazin:
+stepprflow:
   broker:
     type: rabbitmq  # Changed from 'kafka'
 
@@ -253,7 +253,7 @@ Register your broker with auto-configuration:
 
 ```java
 @Configuration
-@ConditionalOnProperty(name = "thalyazin.broker.type", havingValue = "custom")
+@ConditionalOnProperty(name = "stepprflow.broker.type", havingValue = "custom")
 public class CustomBrokerAutoConfiguration {
 
     @Bean
@@ -295,7 +295,7 @@ public class CustomBrokerAutoConfiguration {
 
 ## Circuit Breaker
 
-Thalyazin includes built-in circuit breaker protection for message brokers using [Resilience4j](https://resilience4j.readme.io/). This prevents cascade failures when a broker becomes unavailable.
+Steppr Flow includes built-in circuit breaker protection for message brokers using [Resilience4j](https://resilience4j.readme.io/). This prevents cascade failures when a broker becomes unavailable.
 
 ### How it works
 
@@ -308,7 +308,7 @@ The circuit breaker wraps all broker operations and monitors failure rates:
 ### Configuration
 
 ```yaml
-thalyazin:
+stepprflow:
   circuit-breaker:
     enabled: true                                    # Enable/disable circuit breaker
     failure-rate-threshold: 50                       # % of failures to open circuit
@@ -387,7 +387,7 @@ Example response:
 
 ### Monitoring via UI
 
-The Thalyazin UI displays circuit breaker information in the **Metrics** page:
+The Steppr Flow UI displays circuit breaker information in the **Metrics** page:
 
 - Current state of each circuit breaker (CLOSED/OPEN/HALF_OPEN)
 - Success/failure counts and rates
@@ -399,7 +399,7 @@ The Thalyazin UI displays circuit breaker information in the **Metrics** page:
 To disable the circuit breaker (not recommended for production):
 
 ```yaml
-thalyazin:
+stepprflow:
   circuit-breaker:
     enabled: false
 ```
@@ -408,29 +408,29 @@ thalyazin:
 
 ## Distributed Tracing
 
-Thalyazin includes built-in distributed tracing using [Micrometer Tracing](https://micrometer.io/docs/tracing). This provides observability across your workflow executions.
+Steppr Flow includes built-in distributed tracing using [Micrometer Tracing](https://micrometer.io/docs/tracing). This provides observability across your workflow executions.
 
 ### How it works
 
 Every workflow step execution is automatically traced with:
-- **Span name**: `thalyazin.workflow.step`
+- **Span name**: `stepprflow.workflow.step`
 - **Contextual name**: `{topic}.{stepLabel}` (e.g., `order-workflow.validate-order`)
 
 ### Tags (Low Cardinality)
 
 | Tag | Description |
 |-----|-------------|
-| `thalyazin.workflow.topic` | Workflow topic name |
-| `thalyazin.workflow.step.id` | Step ID (1, 2, 3...) |
-| `thalyazin.workflow.step.label` | Step label |
-| `thalyazin.workflow.status` | Execution status (SUCCESS, FAILED) |
+| `stepprflow.workflow.topic` | Workflow topic name |
+| `stepprflow.workflow.step.id` | Step ID (1, 2, 3...) |
+| `stepprflow.workflow.step.label` | Step label |
+| `stepprflow.workflow.status` | Execution status (SUCCESS, FAILED) |
 
 ### Tags (High Cardinality)
 
 | Tag | Description |
 |-----|-------------|
-| `thalyazin.workflow.execution.id` | Unique execution ID |
-| `thalyazin.workflow.correlation.id` | Correlation ID for tracing related operations |
+| `stepprflow.workflow.execution.id` | Unique execution ID |
+| `stepprflow.workflow.correlation.id` | Correlation ID for tracing related operations |
 
 ### Enabling Tracing
 
