@@ -45,34 +45,30 @@ Steppr Flow enables you to build resilient, async multi-step workflows with supp
 public class OrderWorkflow {
 
     @Step(id = 1, label = "Validate order")
-    public OrderPayload validateOrder(OrderPayload payload) {
+    public void validateOrder(OrderPayload payload) {
         // Validation logic
         if (payload.getItems().isEmpty()) {
             throw new IllegalArgumentException("Order must have items");
         }
-        return payload;
     }
 
     @Step(id = 2, label = "Reserve inventory")
-    public OrderPayload reserveInventory(OrderPayload payload) {
+    public void reserveInventory(OrderPayload payload) {
         // Reserve items in inventory
         inventoryService.reserve(payload.getItems());
-        return payload;
     }
 
     @Step(id = 3, label = "Process payment")
     @Timeout(value = 30, unit = TimeUnit.SECONDS)
-    public OrderPayload processPayment(OrderPayload payload) {
+    public void processPayment(OrderPayload payload) {
         // Payment processing
         paymentService.charge(payload.getPaymentInfo());
-        return payload;
     }
 
     @Step(id = 4, label = "Send confirmation")
-    public OrderPayload sendConfirmation(OrderPayload payload) {
+    public void sendConfirmation(OrderPayload payload) {
         // Send confirmation email
         notificationService.sendOrderConfirmation(payload);
-        return payload;
     }
 }
 ```
