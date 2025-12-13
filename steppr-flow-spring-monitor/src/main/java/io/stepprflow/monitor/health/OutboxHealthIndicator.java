@@ -1,5 +1,6 @@
 package io.stepprflow.monitor.health;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.stepprflow.monitor.MonitorProperties;
 import io.stepprflow.monitor.outbox.OutboxMessage.OutboxStatus;
 import io.stepprflow.monitor.outbox.OutboxMessageRepository;
@@ -46,6 +47,9 @@ public class OutboxHealthIndicator implements HealthIndicator {
      * @param outboxRepository the outbox repository
      * @param properties the monitor properties
      */
+    @SuppressFBWarnings(
+            value = "EI_EXPOSE_REP2",
+            justification = "Spring-managed beans are safely shared via dependency injection")
     public OutboxHealthIndicator(
             OutboxMessageRepository outboxRepository,
             MonitorProperties properties) {

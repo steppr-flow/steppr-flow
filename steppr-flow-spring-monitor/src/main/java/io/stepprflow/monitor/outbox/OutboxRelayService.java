@@ -1,6 +1,7 @@
 package io.stepprflow.monitor.outbox;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.stepprflow.core.broker.MessageBroker;
 import io.stepprflow.core.model.WorkflowMessage;
 import io.stepprflow.monitor.MonitorProperties;
@@ -42,6 +43,9 @@ public class OutboxRelayService {
     private final ObjectMapper objectMapper;
     private final MonitorProperties.Outbox config;
 
+    @SuppressFBWarnings(
+            value = "EI_EXPOSE_REP2",
+            justification = "Spring-managed beans are safely shared via dependency injection")
     public OutboxRelayService(
             OutboxMessageRepository outboxRepository,
             MessageBroker messageBroker,
