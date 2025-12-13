@@ -40,7 +40,7 @@ Steppr Flow enables you to build resilient, async multi-step workflows with supp
 **Maven :**
 ```xml
 <dependency>
-    <groupId>io.stepprflow</groupId>
+    <groupId>io.github.steppr-flow</groupId>
     <artifactId>steppr-flow-spring-boot-starter</artifactId>
     <version>1.0.0</version>
 </dependency>
