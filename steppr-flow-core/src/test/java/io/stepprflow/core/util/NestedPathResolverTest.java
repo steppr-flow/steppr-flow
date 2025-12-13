@@ -431,5 +431,84 @@ class NestedPathResolverTest {
 
             assertThat(result).isTrue();
         }
+
+        @Test
+        @DisplayName("Should return true for existing array element")
+        void shouldReturnTrueForExistingArrayElement() {
+            List<String> items = new ArrayList<>();
+            items.add("apple");
+            items.add("banana");
+
+            Map<String, Object> map = new HashMap<>();
+            map.put("items", items);
+
+            boolean result = resolver.hasValue(map, "items[0]");
+
+            assertThat(result).isTrue();
+        }
+
+        @Test
+        @DisplayName("Should return false for out of bounds array index")
+        void shouldReturnFalseForOutOfBoundsArrayIndex() {
+            List<String> items = new ArrayList<>();
+            items.add("apple");
+
+            Map<String, Object> map = new HashMap<>();
+            map.put("items", items);
+
+            boolean result = resolver.hasValue(map, "items[5]");
+
+            assertThat(result).isFalse();
+        }
+
+        @Test
+        @DisplayName("Should return false for negative array index")
+        void shouldReturnFalseForNegativeArrayIndex() {
+            List<String> items = new ArrayList<>();
+            items.add("apple");
+
+            Map<String, Object> map = new HashMap<>();
+            map.put("items", items);
+
+            boolean result = resolver.hasValue(map, "items[-1]");
+
+            assertThat(result).isFalse();
+        }
+
+        @Test
+        @DisplayName("Should return false when array notation used on non-list")
+        void shouldReturnFalseWhenArrayNotationUsedOnNonList() {
+            Map<String, Object> map = new HashMap<>();
+            map.put("items", "not a list");
+
+            boolean result = resolver.hasValue(map, "items[0]");
+
+            assertThat(result).isFalse();
+        }
+
+        @Test
+        @DisplayName("Should return false when intermediate path is not a map")
+        void shouldReturnFalseWhenIntermediatePathIsNotAMap() {
+            Map<String, Object> map = new HashMap<>();
+            map.put("name", "John");
+
+            boolean result = resolver.hasValue(map, "name.first");
+
+            assertThat(result).isFalse();
+        }
+
+        @Test
+        @DisplayName("Should return false when nested path does not exist")
+        void shouldReturnFalseWhenNestedPathDoesNotExist() {
+            Map<String, Object> address = new HashMap<>();
+            address.put("city", "Paris");
+
+            Map<String, Object> map = new HashMap<>();
+            map.put("address", address);
+
+            boolean result = resolver.hasValue(map, "address.country");
+
+            assertThat(result).isFalse();
+        }
     }
 }

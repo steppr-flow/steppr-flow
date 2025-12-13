@@ -213,6 +213,154 @@ class WorkflowMetricsTest {
     }
 
     @Nested
+    @DisplayName("Step metrics")
+    class StepMetricsTests {
+
+        @Test
+        @DisplayName("Should record step executed with duration")
+        void shouldRecordStepExecutedWithDuration() {
+            workflowMetrics.recordStepExecuted("order-workflow", "validateOrder", Duration.ofMillis(100));
+
+            Counter counter = meterRegistry.find("stepprflow.step.executed")
+                    .tag("topic", "order-workflow")
+                    .tag("step", "validateOrder")
+                    .counter();
+
+            assertThat(counter).isNotNull();
+            assertThat(counter.count()).isEqualTo(1.0);
+        }
+
+        @Test
+        @DisplayName("Should record step failed")
+        void shouldRecordStepFailed() {
+            workflowMetrics.recordStepFailed("order-workflow", "processPayment");
+
+            Counter counter = meterRegistry.find("stepprflow.step.failed")
+                    .tag("topic", "order-workflow")
+                    .tag("step", "processPayment")
+                    .counter();
+
+            assertThat(counter).isNotNull();
+            assertThat(counter.count()).isEqualTo(1.0);
+        }
+
+        @Test
+        @DisplayName("Should record step timeout")
+        void shouldRecordStepTimeout() {
+            workflowMetrics.recordStepTimeout("order-workflow", "checkInventory");
+
+            Counter counter = meterRegistry.find("stepprflow.step.timeout")
+                    .tag("topic", "order-workflow")
+                    .tag("step", "checkInventory")
+                    .counter();
+
+            assertThat(counter).isNotNull();
+            assertThat(counter.count()).isEqualTo(1.0);
+        }
+    }
+
+    @Nested
+    @DisplayName("Retry and DLQ metrics")
+    class RetryAndDlqTests {
+
+        @Test
+        @DisplayName("Should record retry count")
+        void shouldRecordRetryCount() {
+            workflowMetrics.recordRetry("order-workflow", 3);
+
+            Counter counter = meterRegistry.find("stepprflow.retry.count")
+                    .tag("topic", "order-workflow")
+                    .counter();
+
+            assertThat(counter).isNotNull();
+            assertThat(counter.count()).isEqualTo(1.0);
+        }
+
+        @Test
+        @DisplayName("Should record DLQ count")
+        void shouldRecordDlqCount() {
+            workflowMetrics.recordDlq("failed-workflow");
+
+            Counter counter = meterRegistry.find("stepprflow.dlq.count")
+                    .tag("topic", "failed-workflow")
+                    .counter();
+
+            assertThat(counter).isNotNull();
+            assertThat(counter.count()).isEqualTo(1.0);
+        }
+    }
+
+    @Nested
+    @DisplayName("Global summary")
+    class GlobalSummaryTests {
+
+        @Test
+        @DisplayName("Should return global summary across all topics")
+        void shouldReturnGlobalSummaryAcrossAllTopics() {
+            workflowMetrics.recordWorkflowStarted("order-workflow", "kafka-sample");
+            workflowMetrics.recordWorkflowStarted("order-workflow", "kafka-sample");
+            workflowMetrics.recordWorkflowCompleted("order-workflow", "kafka-sample", Duration.ofMillis(1000));
+            workflowMetrics.recordWorkflowStarted("payment-workflow", "rabbitmq-sample");
+            workflowMetrics.recordWorkflowFailed("payment-workflow", "rabbitmq-sample", Duration.ofMillis(500));
+            workflowMetrics.recordRetry("order-workflow", 1);
+            workflowMetrics.recordDlq("payment-workflow");
+
+            MetricsSummary summary = workflowMetrics.getGlobalSummary();
+
+            assertThat(summary.getTopic()).isEqualTo("_global");
+            assertThat(summary.getWorkflowsStarted()).isEqualTo(3);
+            assertThat(summary.getWorkflowsCompleted()).isEqualTo(1);
+            assertThat(summary.getWorkflowsFailed()).isEqualTo(1);
+            assertThat(summary.getRetryCount()).isEqualTo(1);
+            assertThat(summary.getDlqCount()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("Should calculate success rate correctly")
+        void shouldCalculateSuccessRateCorrectly() {
+            workflowMetrics.recordWorkflowStarted("order-workflow", "kafka-sample");
+            workflowMetrics.recordWorkflowStarted("order-workflow", "kafka-sample");
+            workflowMetrics.recordWorkflowCompleted("order-workflow", "kafka-sample", Duration.ofMillis(1000));
+
+            MetricsSummary summary = workflowMetrics.getGlobalSummary();
+
+            assertThat(summary.getSuccessRate()).isEqualTo(50.0);
+        }
+
+        @Test
+        @DisplayName("Should return zero success rate when no workflows started")
+        void shouldReturnZeroSuccessRateWhenNoWorkflowsStarted() {
+            MetricsSummary summary = workflowMetrics.getGlobalSummary();
+
+            assertThat(summary.getSuccessRate()).isEqualTo(0.0);
+        }
+    }
+
+    @Nested
+    @DisplayName("getActiveTopics")
+    class GetActiveTopicsTests {
+
+        @Test
+        @DisplayName("Should return set of active topics")
+        void shouldReturnSetOfActiveTopics() {
+            workflowMetrics.recordWorkflowStarted("order-workflow", "kafka-sample");
+            workflowMetrics.recordWorkflowStarted("payment-workflow", "rabbitmq-sample");
+
+            Set<String> topics = workflowMetrics.getActiveTopics();
+
+            assertThat(topics).isNotEmpty();
+        }
+
+        @Test
+        @DisplayName("Should return empty set when no workflows recorded")
+        void shouldReturnEmptySetWhenNoWorkflowsRecorded() {
+            Set<String> topics = workflowMetrics.getActiveTopics();
+
+            assertThat(topics).isEmpty();
+        }
+    }
+
+    @Nested
     @DisplayName("Backward compatibility")
     class BackwardCompatibilityTests {
 
