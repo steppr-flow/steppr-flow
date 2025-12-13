@@ -25,6 +25,8 @@ import org.testcontainers.containers.RabbitMQContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -156,6 +158,117 @@ class RabbitMQMessageBrokerIntegrationTest {
     @Test
     void isAvailable_shouldReturnTrueWhenConnected() {
         assertThat(messageBroker.isAvailable()).isTrue();
+    }
+
+    @Test
+    void send_shouldMaintainMessageOrderFIFO() {
+        // Given - send multiple messages in order
+        int messageCount = 5;
+        String[] executionIds = new String[messageCount];
+
+        for (int i = 0; i < messageCount; i++) {
+            executionIds[i] = "order-test-" + i;
+            WorkflowMessage message = WorkflowMessage.builder()
+                    .executionId(executionIds[i])
+                    .correlationId(UUID.randomUUID().toString())
+                    .topic(TEST_ROUTING_KEY)
+                    .currentStep(i + 1)
+                    .totalSteps(messageCount)
+                    .status(WorkflowStatus.IN_PROGRESS)
+                    .payload(Map.of("order", i))
+                    .build();
+            messageBroker.send(TEST_ROUTING_KEY, message);
+        }
+
+        // Then - messages should be received in FIFO order
+        await().atMost(15, TimeUnit.SECONDS).untilAsserted(() -> {
+            for (int i = 0; i < messageCount; i++) {
+                Message receivedMessage = rabbitTemplate.receive(TEST_QUEUE, 1000);
+                assertThat(receivedMessage).isNotNull();
+
+                WorkflowMessage received = (WorkflowMessage) rabbitTemplate.getMessageConverter()
+                        .fromMessage(receivedMessage);
+                assertThat(received.getExecutionId()).isEqualTo(executionIds[i]);
+                assertThat(received.getCurrentStep()).isEqualTo(i + 1);
+            }
+        });
+    }
+
+    @Test
+    void send_shouldConfigureDeadLetterQueueCorrectly() {
+        // Given - setup separate queue with DLQ for this test
+        String testQueueDlq = "dlq-test-queue";
+        String dlqName = testQueueDlq + ".dlq";
+        String dlxName = "dlq-test-exchange.dlx";
+        String dlqRoutingKey = "dlq-test-routing";
+
+        // Create DLX and DLQ
+        DirectExchange dlx = new DirectExchange(dlxName);
+        Queue dlq = new Queue(dlqName, true);
+        Binding dlqBinding = BindingBuilder.bind(dlq).to(dlx).with(dlqRoutingKey);
+
+        rabbitAdmin.declareExchange(dlx);
+        rabbitAdmin.declareQueue(dlq);
+        rabbitAdmin.declareBinding(dlqBinding);
+
+        // Create main queue with DLX configuration
+        Queue queueWithDlx = QueueBuilder.durable(testQueueDlq)
+                .withArgument("x-dead-letter-exchange", dlxName)
+                .withArgument("x-dead-letter-routing-key", dlqRoutingKey)
+                .build();
+        rabbitAdmin.declareQueue(queueWithDlx);
+
+        // Bind to test exchange
+        rabbitAdmin.declareBinding(BindingBuilder.bind(queueWithDlx)
+                .to(new DirectExchange(TEST_EXCHANGE)).with(dlqRoutingKey));
+
+        // When - send a message to the DLQ-enabled queue
+        WorkflowMessage message = createTestMessage();
+        rabbitTemplate.convertAndSend(TEST_EXCHANGE, dlqRoutingKey, message);
+
+        // Then - message should be delivered to the queue
+        await().atMost(10, TimeUnit.SECONDS).untilAsserted(() -> {
+            Message receivedMessage = rabbitTemplate.receive(testQueueDlq, 1000);
+            assertThat(receivedMessage).isNotNull();
+
+            // Verify message properties
+            MessageProperties props = receivedMessage.getMessageProperties();
+            assertThat(props).isNotNull();
+        });
+
+        // Cleanup
+        rabbitAdmin.deleteQueue(testQueueDlq);
+        rabbitAdmin.deleteQueue(dlqName);
+        rabbitAdmin.deleteExchange(dlxName);
+    }
+
+    @Test
+    void sendMultipleMessages_shouldAllBeDelivered() {
+        // Given
+        int messageCount = 10;
+        List<String> sentIds = new ArrayList<>();
+
+        // When - send multiple messages
+        for (int i = 0; i < messageCount; i++) {
+            WorkflowMessage message = createTestMessage();
+            sentIds.add(message.getExecutionId());
+            messageBroker.send(TEST_ROUTING_KEY, message);
+        }
+
+        // Then - all messages should be received
+        List<String> receivedIds = new ArrayList<>();
+        await().atMost(15, TimeUnit.SECONDS).untilAsserted(() -> {
+            for (int i = 0; i < messageCount; i++) {
+                Message receivedMessage = rabbitTemplate.receive(TEST_QUEUE, 1000);
+                if (receivedMessage != null) {
+                    WorkflowMessage received = (WorkflowMessage) rabbitTemplate.getMessageConverter()
+                            .fromMessage(receivedMessage);
+                    receivedIds.add(received.getExecutionId());
+                }
+            }
+            assertThat(receivedIds).hasSize(messageCount);
+            assertThat(receivedIds).containsExactlyInAnyOrderElementsOf(sentIds);
+        });
     }
 
     private WorkflowMessage createTestMessage() {

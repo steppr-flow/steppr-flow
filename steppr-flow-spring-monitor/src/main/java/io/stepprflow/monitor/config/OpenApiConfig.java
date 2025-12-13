@@ -60,7 +60,7 @@ public class OpenApiConfig {
                                 .name("Circuit Breaker")
                                 .description("Circuit breaker monitoring and management"),
                         new Tag()
-                                .name("Dashboard")
-                                .description("Dashboard-specific endpoints for UI")));
+                                .name("Registry")
+                                .description("Workflow registration from microservices")));
     }
 }
