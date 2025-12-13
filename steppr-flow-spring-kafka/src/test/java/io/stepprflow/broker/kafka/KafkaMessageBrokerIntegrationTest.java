@@ -34,7 +34,13 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 import java.time.Duration;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -157,6 +163,130 @@ class KafkaMessageBrokerIntegrationTest {
     @Test
     void isAvailable_shouldReturnTrueWhenConnected() {
         assertThat(messageBroker.isAvailable()).isTrue();
+    }
+
+    @Test
+    void send_shouldMaintainMessageOrderFIFO() {
+        // Given - send multiple messages with the same key (executionId)
+        int messageCount = 5;
+        String sharedExecutionId = "fifo-test-" + UUID.randomUUID();
+        String[] correlationIds = new String[messageCount];
+
+        try (KafkaConsumer<String, WorkflowMessage> consumer = createConsumer()) {
+            consumer.subscribe(Collections.singletonList(TEST_TOPIC));
+            waitForAssignment(consumer);
+
+            // When - send messages with same key to ensure same partition
+            for (int i = 0; i < messageCount; i++) {
+                correlationIds[i] = "correlation-" + i;
+                WorkflowMessage message = WorkflowMessage.builder()
+                        .executionId(sharedExecutionId)
+                        .correlationId(correlationIds[i])
+                        .topic(TEST_TOPIC)
+                        .currentStep(i + 1)
+                        .totalSteps(messageCount)
+                        .status(WorkflowStatus.IN_PROGRESS)
+                        .payload(Map.of("order", i))
+                        .build();
+                messageBroker.sendSync(TEST_TOPIC, message);
+            }
+
+            // Then - messages should be received in FIFO order (same partition = ordered)
+            List<WorkflowMessage> receivedMessages = new ArrayList<>();
+            long deadline = System.currentTimeMillis() + 30_000;
+            while (receivedMessages.size() < messageCount && System.currentTimeMillis() < deadline) {
+                ConsumerRecords<String, WorkflowMessage> records = consumer.poll(Duration.ofMillis(500));
+                for (ConsumerRecord<String, WorkflowMessage> record : records) {
+                    if (record.value() != null && sharedExecutionId.equals(record.value().getExecutionId())) {
+                        receivedMessages.add(record.value());
+                    }
+                }
+            }
+
+            assertThat(receivedMessages).hasSize(messageCount);
+            for (int i = 0; i < messageCount; i++) {
+                assertThat(receivedMessages.get(i).getCorrelationId()).isEqualTo(correlationIds[i]);
+                assertThat(receivedMessages.get(i).getCurrentStep()).isEqualTo(i + 1);
+            }
+        }
+    }
+
+    @Test
+    void sendMultipleMessages_shouldAllBeDelivered() {
+        // Given
+        int messageCount = 10;
+        List<String> sentIds = new ArrayList<>();
+
+        try (KafkaConsumer<String, WorkflowMessage> consumer = createConsumer()) {
+            consumer.subscribe(Collections.singletonList(TEST_TOPIC));
+            waitForAssignment(consumer);
+
+            // When - send multiple messages with unique execution IDs
+            for (int i = 0; i < messageCount; i++) {
+                WorkflowMessage message = createTestMessage();
+                sentIds.add(message.getExecutionId());
+                messageBroker.sendSync(TEST_TOPIC, message);
+            }
+
+            // Then - all messages should be received
+            List<String> receivedIds = new ArrayList<>();
+            long deadline = System.currentTimeMillis() + 30_000;
+            while (receivedIds.size() < messageCount && System.currentTimeMillis() < deadline) {
+                ConsumerRecords<String, WorkflowMessage> records = consumer.poll(Duration.ofMillis(500));
+                for (ConsumerRecord<String, WorkflowMessage> record : records) {
+                    if (record.value() != null && sentIds.contains(record.value().getExecutionId())) {
+                        receivedIds.add(record.value().getExecutionId());
+                    }
+                }
+            }
+
+            assertThat(receivedIds).hasSize(messageCount);
+            assertThat(receivedIds).containsExactlyInAnyOrderElementsOf(sentIds);
+        }
+    }
+
+    @Test
+    void send_shouldUseExecutionIdAsPartitionKey() {
+        // Given - messages with same executionId should go to same partition
+        String sharedExecutionId = "partition-test-" + UUID.randomUUID();
+        int messageCount = 3;
+
+        try (KafkaConsumer<String, WorkflowMessage> consumer = createConsumer()) {
+            consumer.subscribe(Collections.singletonList(TEST_TOPIC));
+            waitForAssignment(consumer);
+
+            // When - send multiple messages with same executionId
+            for (int i = 0; i < messageCount; i++) {
+                WorkflowMessage message = WorkflowMessage.builder()
+                        .executionId(sharedExecutionId)
+                        .correlationId(UUID.randomUUID().toString())
+                        .topic(TEST_TOPIC)
+                        .currentStep(i + 1)
+                        .totalSteps(messageCount)
+                        .status(WorkflowStatus.IN_PROGRESS)
+                        .payload(Map.of("index", i))
+                        .build();
+                messageBroker.sendSync(TEST_TOPIC, message);
+            }
+
+            // Then - all messages should be on the same partition
+            List<Integer> partitions = new ArrayList<>();
+            long deadline = System.currentTimeMillis() + 30_000;
+            int receivedCount = 0;
+            while (receivedCount < messageCount && System.currentTimeMillis() < deadline) {
+                ConsumerRecords<String, WorkflowMessage> records = consumer.poll(Duration.ofMillis(500));
+                for (ConsumerRecord<String, WorkflowMessage> record : records) {
+                    if (record.value() != null && sharedExecutionId.equals(record.value().getExecutionId())) {
+                        partitions.add(record.partition());
+                        receivedCount++;
+                    }
+                }
+            }
+
+            assertThat(partitions).hasSize(messageCount);
+            // All messages should be on the same partition
+            assertThat(partitions.stream().distinct()).hasSize(1);
+        }
     }
 
     private void waitForAssignment(KafkaConsumer<?, ?> consumer) {

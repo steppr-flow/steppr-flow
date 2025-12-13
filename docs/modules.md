@@ -119,12 +119,15 @@ steppr-flow:
 **Purpose:** Monitoring capabilities, REST API, and WebSocket support.
 
 **Key Components:**
-- `WorkflowMonitorService` - Core monitoring logic
-- `WorkflowController` - REST API for workflow operations
-- `MetricsController` - Metrics and statistics endpoints
-- `WorkflowWebSocketHandler` - Real-time updates via WebSocket
-- `ExecutionPersistenceService` - MongoDB persistence
+- `WorkflowQueryService` - Query operations for workflow executions
+- `WorkflowCommandService` - State-changing operations (resume, cancel)
 - `PayloadManagementService` - Payload editing and restoration
+- `ExecutionPersistenceService` - MongoDB persistence and event handling
+- `RetrySchedulerService` - Automatic retry scheduling
+- `WorkflowController` - REST API for workflow operations
+- `DashboardController` - Dashboard and overview endpoints
+- `MetricsController` - Metrics and statistics endpoints
+- `WorkflowBroadcaster` - Real-time updates via WebSocket
 
 **Dependencies:**
 - `steppr-flow-core`

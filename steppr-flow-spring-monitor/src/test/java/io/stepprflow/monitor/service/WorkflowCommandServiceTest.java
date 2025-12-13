@@ -113,7 +113,7 @@ class WorkflowCommandServiceTest {
             commandService.resume("exec-123", null, "UI User");
 
             verify(messageFactory).createResumeMessage(testExecution, 2);
-            verify(messageBroker).send("test-topic", resumeMessage);
+            verify(messageBroker).sendSync("test-topic", resumeMessage);
         }
 
         @Test
@@ -128,7 +128,7 @@ class WorkflowCommandServiceTest {
 
             commandService.resume("exec-123", null, "UI User");
 
-            verify(messageBroker).send(eq("test-topic"), any(WorkflowMessage.class));
+            verify(messageBroker).sendSync(eq("test-topic"), any(WorkflowMessage.class));
         }
 
         @Test
@@ -143,7 +143,7 @@ class WorkflowCommandServiceTest {
 
             commandService.resume("exec-123", null, "UI User");
 
-            verify(messageBroker).send(eq("test-topic"), any(WorkflowMessage.class));
+            verify(messageBroker).sendSync(eq("test-topic"), any(WorkflowMessage.class));
         }
 
         @Test
@@ -158,7 +158,7 @@ class WorkflowCommandServiceTest {
             commandService.resume("exec-123", 1, "UI User");
 
             verify(messageFactory).createResumeMessage(testExecution, 1);
-            verify(messageBroker).send("test-topic", resumeMessage);
+            verify(messageBroker).sendSync("test-topic", resumeMessage);
         }
 
         @Test

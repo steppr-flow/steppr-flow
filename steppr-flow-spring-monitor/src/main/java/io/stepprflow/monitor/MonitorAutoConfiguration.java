@@ -3,6 +3,7 @@ package io.stepprflow.monitor;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.stepprflow.core.metrics.WorkflowMetrics;
 import io.stepprflow.core.metrics.WorkflowMetricsListener;
+import io.stepprflow.monitor.config.OpenApiConfig;
 import io.stepprflow.monitor.config.WebSocketConfig;
 import io.stepprflow.monitor.controller.CircuitBreakerController;
 import io.stepprflow.monitor.controller.GlobalExceptionHandler;
@@ -11,7 +12,6 @@ import io.stepprflow.monitor.controller.WorkflowController;
 import io.stepprflow.monitor.repository.WorkflowExecutionRepository;
 import io.stepprflow.monitor.service.ExecutionPersistenceService;
 import io.stepprflow.monitor.service.RetrySchedulerService;
-import io.stepprflow.monitor.service.WorkflowMonitorService;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -32,12 +32,12 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 @EnableAsync
 @Import({
+        OpenApiConfig.class,
         WebSocketConfig.class,
         GlobalExceptionHandler.class,
         WorkflowController.class,
         CircuitBreakerController.class,
         ExecutionPersistenceService.class,
-        WorkflowMonitorService.class,
         RetrySchedulerService.class
 })
 public class MonitorAutoConfiguration {
